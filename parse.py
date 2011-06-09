@@ -3,14 +3,16 @@
 import re
 import urllib
 from BeautifulSoup import BeautifulSoup, NavigableString
+import logging
 
 
 class List(list):
     """
-    List, jez preposila volani vlastnosti, ktere sam nezna, na svoje polozky
+    List that proxies calls to unknown properties to his items
 
-    Pokud je volana vlastnost, je vracen List vlastnosti.
-    Pokud je volana metoda polozek, je vracena loop funkce, ktera pri zavolani, vola metodu vsech na polozkach.
+    If list empty, returns self.
+    If called item's property, returns List of item's properties.
+    If called item's method, returns loop function, that calls desired item's method on execution.
     """
 
     def __getattr__(self, name):
@@ -33,7 +35,7 @@ class List(list):
 
 class SelectorList(List):
     """
-    List objektu css selektoru
+    List of CSS selector objects
     """
 
     def __init__(self, l=[]):
@@ -45,7 +47,7 @@ class SelectorList(List):
 
 class Selector(object):
     """
-    Objekt css selektoru
+    CSS selector object
     """
 
     def __init__(self, selector):
@@ -72,34 +74,35 @@ class Selector(object):
 
 
 
-class SoupCook(object):
-    """Kuchar"""
+class Chef(object):
+    """Chef"""
 
-    wanted_tags_selector = SelectorList()
-    valid_tags = []
-    forbidden_tags = []
+    def __init__(self, wanted_tags_selector=[], valid_tags = [], forbidden_tags = []):
+        self.wanted_tags_selector = SelectorList(wanted_tags_selector)
+        self.valid_tags = valid_tags
+        self.forbidden_tags = forbidden_tags
 
 
     def find_wanted_content(self, soup):
         """
-        Najde pozadovane tagy.
+        Finds wanted elements.
         """
         assert isinstance(soup, BeautifulSoup)
         new_soup = BeautifulSoup()
         for selector in self.wanted_tags_selector:
             tag = soup.find(**selector.soup)
-            print 'Looking for element %s...' % selector.out(),
+            logging.info('Looking for element %s...' % selector.out())
             if tag:
-                print 'found'
+                logging.info('found')
                 new_soup.insert(0, tag)
             else:
-                print 'NOT FOUND'
+                logging.info('NOT FOUND')
         return new_soup
 
 
     def remove_tags(self, soup):
         """
-        Odmaze tag i s jeho obsahem.
+        Removes forbidden elements.
         """
         assert isinstance(soup, BeautifulSoup)
         tags = soup.findAll(lambda tag: tag.name in self.forbidden_tags)
@@ -109,18 +112,18 @@ class SoupCook(object):
 
     def strip_tags(self, soup):
         """
-        Odmaze vsechny tagy, krome validnich, ale ponecha jejich obsah.
+        Strip unwanted tags.
         """
         if not isinstance(soup, BeautifulSoup):
             soup = BeautifulSoup(soup)
         for tag in soup.findAll(True):
             if tag.name in self.valid_tags:
-                # kontrola atributu vyhovujicim tagum
+                # Check of valid element attributes
                 for attr in dict(tag.attrs).keys():
                     if attr not in self.valid_tags[tag.name]:
                         del tag[attr]
             else:
-                # odstraneni nevyhovujicich tagu
+                # Striping of invalid elements
                 s = ""
                 for c in tag.contents:
                     if not isinstance(c, NavigableString):
@@ -153,22 +156,18 @@ forbidden_tags = [
     'script'
 ]
 
-cook = SoupCook()
-cook.wanted_tags_selector = SelectorList(wanted_tags_selector)
-cook.valid_tags = valid_tags
-cook.forbidden_tags = forbidden_tags
+chef = Chef(wanted_tags_selector, valid_tags, forbidden_tags)
 
-print 'Fetching %s' % data_url
+logging.info('Fetching %s' % data_url)
 data_file = urllib.urlopen(data_url)
 content = data_file.read()
 
 soup = BeautifulSoup(content)
 
-soup = cook.find_wanted_content(soup)
-soup = cook.remove_tags(soup)
-soup = cook.strip_tags(soup)
+soup = chef.find_wanted_content(soup)
+soup = chef.remove_tags(soup)
+soup = chef.strip_tags(soup)
 
-soup.prettify()
-
-
+noodle = soup.prettify()
+print noodle
 
